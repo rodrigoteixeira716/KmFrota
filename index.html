@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>KM Frota</title>
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--ink:#0f172a;--muted:#64748b;--primary:#2563eb;--ok:#16a34a;--warn:#f59e0b;--danger:#dc2626;--line:#e2e8f0}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--ink)}
+header{background:#0f172a;color:white;padding:18px 16px 16px;position:sticky;top:0;z-index:5;box-shadow:0 2px 12px #0002}
+header h1{margin:0;font-size:22px}header p{margin:4px 0 0;color:#cbd5e1;font-size:13px}
+main{max-width:760px;margin:auto;padding:14px 14px 92px}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat{background:var(--card);border-radius:14px;padding:12px;text-align:center;box-shadow:0 1px 5px #0001}
+.stat b{display:block;font-size:21px}.stat span{font-size:11px;color:var(--muted)}
+.toolbar{display:flex;gap:8px;margin:12px 0}.toolbar button,.btn{border:0;border-radius:12px;padding:11px 13px;font-weight:700;cursor:pointer}
+.toolbar button{background:white;color:var(--ink);box-shadow:0 1px 5px #0001;flex:1}
+.vehicle{background:var(--card);border-radius:16px;padding:14px;margin:10px 0;box-shadow:0 1px 7px #0001;border-left:5px solid var(--warn)}
+.vehicle.done{border-left-color:var(--ok)}.top{display:flex;justify-content:space-between;gap:10px;align-items:start}
+.name{font-weight:800;font-size:17px}.plate{font-size:13px;color:var(--muted);margin-top:2px}.badge{font-size:11px;padding:5px 8px;border-radius:999px;background:#fef3c7;color:#92400e;font-weight:800;white-space:nowrap}
+.done .badge{background:#dcfce7;color:#166534}.kms{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:12px 0 10px}
+.km{background:#f8fafc;border-radius:10px;padding:8px}.km span{display:block;font-size:10px;color:var(--muted)}.km b{font-size:14px}
+.actions{display:flex;gap:8px}.actions input{width:100%;min-width:0;border:1px solid var(--line);border-radius:11px;padding:11px;font-size:16px}
+.actions button{background:var(--primary);color:#fff;border:0;border-radius:11px;padding:0 15px;font-weight:800}
+.sectionTitle{font-size:15px;margin:20px 2px 8px}.history{background:white;border-radius:14px;overflow:hidden}.hist{padding:11px 12px;border-bottom:1px solid var(--line);font-size:13px}.hist:last-child{border:0}.hist small{color:var(--muted)}
+.bottom{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:6}
+.bottom button{flex:1;border:0;border-radius:13px;padding:13px 8px;font-weight:800}.report{background:#0f172a;color:#fff}.backup{background:#e2e8f0;color:#0f172a}
+dialog{border:0;border-radius:18px;width:min(92%,600px);padding:0;box-shadow:0 20px 60px #0005}dialog::backdrop{background:#0008}.modal{padding:18px}.modal h2{margin-top:0}.modal textarea{width:100%;height:330px;border:1px solid var(--line);border-radius:12px;padding:12px;resize:none}.modalBtns{display:flex;gap:8px;margin-top:10px}.modalBtns button{flex:1;border:0;border-radius:11px;padding:11px;font-weight:800}
+.empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+@media(max-width:480px){.kms{grid-template-columns:1fr 1fr}.kms .km:last-child{grid-column:1/-1}.summary{gap:6px}.stat{padding:10px 4px}}
+</style>
+</head>
+<body>
+<header><h1>🚗 KM Frota</h1><p>Controle semanal de quilometragem • dados salvos neste aparelho</p></header>
+<main>
+  <div class="summary">
+    <div class="stat"><b id="total">9</b><span>VEÍCULOS</span></div>
+    <div class="stat"><b id="done">0</b><span>REGISTRADOS</span></div>
+    <div class="stat"><b id="pending">9</b><span>PENDENTES</span></div>
+  </div>
+  <div class="toolbar">
+    <button onclick="setToday()">📅 Hoje: <span id="dateLabel"></span></button>
+    <button onclick="showHistory()">🕘 Histórico</button>
+  </div>
+  <div id="vehicles"></div>
+  <div id="historyArea" style="display:none">
+    <h3 class="sectionTitle">Últimos registros</h3>
+    <div class="history" id="history"></div>
+  </div>
+</main>
+<div class="bottom">
+  <button class="backup" onclick="exportBackup()">💾 Backup</button>
+  <button class="report" onclick="makeReport()">📋 Relatório</button>
+</div>
+<dialog id="reportDialog"><div class="modal">
+  <h2>Relatório para Administração</h2>
+  <textarea id="reportText" readonly></textarea>
+  <div class="modalBtns"><button onclick="copyReport()">Copiar</button><button onclick="shareReport()">Compartilhar</button><button onclick="reportDialog.close()">Fechar</button></div>
+</div></dialog>
+<script>
+const FLEET=[
+ {driver:"André",plate:"RKI-9C39"},
+ {driver:"Fernando",plate:"SRZ-0A72"},
+ {driver:"Giovan",plate:"SSC-5E23"},
+ {driver:"Gilberto",plate:"SSE-3B16"},
+ {driver:"Claiton",plate:"SSE-4J89"},
+ {driver:"Janir",plate:"TTC-4H42"},
+ {driver:"Moisés",plate:"TTK-0E66"},
+ {driver:"David",plate:"TTE6E39"},
+ {driver:"Marcelo/Faiga",plate:"TTO0H20"}
+];
+const KEY="kmFrota_v1";
+let data=JSON.parse(localStorage.getItem(KEY)||'{"records":[]}');
+let currentDate=new Date().toISOString().slice(0,10);
+function brDate(d){let [y,m,day]=d.split("-");return `${day}/${m}/${y}`}
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function recordsForDate(){return data.records.filter(r=>r.date===currentDate)}
+function latestBefore(plate,date){
+ return data.records.filter(r=>r.plate===plate && r.date<date).sort((a,b)=>b.date.localeCompare(a.date))[0];
+}
+function currentRec(plate){return data.records.find(r=>r.plate===plate&&r.date===currentDate)}
+function fmt(n){return n==null?"—":Number(n).toLocaleString("pt-BR")}
+function render(){
+ document.getElementById("dateLabel").textContent=brDate(currentDate);
+ const wrap=document.getElementById("vehicles"); wrap.innerHTML="";
+ let completed=0;
+ FLEET.forEach(v=>{
+  const cur=currentRec(v.plate), prev=latestBefore(v.plate,currentDate);
+  if(cur) completed++;
+  const diff=cur&&prev?cur.km-prev.km:null;
+  const div=document.createElement("div"); div.className="vehicle"+(cur?" done":"");
+  div.innerHTML=`<div class="top"><div><div class="name">${v.driver}</div><div class="plate">${v.plate}</div></div><span class="badge">${cur?"REGISTRADO":"PENDENTE"}</span></div>
+  <div class="kms"><div class="km"><span>KM ANTERIOR</span><b>${fmt(prev?.km)}</b></div><div class="km"><span>KM ATUAL</span><b>${fmt(cur?.km)}</b></div><div class="km"><span>PERCORRIDO</span><b>${diff==null?"—":fmt(diff)+" km"}</b></div></div>
+  <div class="actions"><input id="km-${v.plate}" inputmode="numeric" type="number" min="0" placeholder="${cur?'Alterar KM':'Digite o KM atual'}"><button onclick="registerKM('${v.plate}')">${cur?"Atualizar":"Salvar"}</button></div>`;
+  wrap.appendChild(div);
+ });
+ document.getElementById("done").textContent=completed;
+ document.getElementById("pending").textContent=FLEET.length-completed;
+ renderHistory();
+}
+function registerKM(plate){
+ const inp=document.getElementById("km-"+plate), km=Number(inp.value);
+ if(!inp.value||km<0)return alert("Informe uma quilometragem válida.");
+ const prev=latestBefore(plate,currentDate);
+ if(prev && km<prev.km && !confirm(`O KM informado (${fmt(km)}) é menor que o anterior (${fmt(prev.km)}). Salvar mesmo assim?`))return;
+ let cur=currentRec(plate);
+ if(cur){cur.km=km;cur.savedAt=new Date().toISOString()} else data.records.push({date:currentDate,plate,km,savedAt:new Date().toISOString()});
+ save();render();
+}
+function setToday(){currentDate=new Date().toISOString().slice(0,10);render()}
+function renderHistory(){
+ const h=document.getElementById("history"); const arr=[...data.records].sort((a,b)=>(b.date+b.savedAt).localeCompare(a.date+a.savedAt)).slice(0,30);
+ h.innerHTML=arr.length?arr.map(r=>{let v=FLEET.find(x=>x.plate===r.plate);return `<div class="hist"><b>${v?.driver||r.plate}</b> • ${r.plate} — <b>${fmt(r.km)} km</b><br><small>${brDate(r.date)}</small></div>`}).join(""):`<div class="empty">Nenhum registro ainda.</div>`;
+}
+function showHistory(){let a=document.getElementById("historyArea");a.style.display=a.style.display==="none"?"block":"none";if(a.style.display==="block")a.scrollIntoView({behavior:"smooth"})}
+function makeReport(){
+ let lines=[`CONTROLE DE KM DA FROTA`, `Data: ${brDate(currentDate)}`,""];
+ FLEET.forEach(v=>{let cur=currentRec(v.plate),prev=latestBefore(v.plate,currentDate),diff=cur&&prev?cur.km-prev.km:null;
+  lines.push(`${v.driver} — ${v.plate}`);
+  lines.push(`KM: ${cur?fmt(cur.km):"PENDENTE"}${diff!=null?` | Percorrido: ${fmt(diff)} km`:""}`);lines.push("");
+ });
+ document.getElementById("reportText").value=lines.join("\n");document.getElementById("reportDialog").showModal();
+}
+async function copyReport(){await navigator.clipboard.writeText(document.getElementById("reportText").value);alert("Relatório copiado!")}
+async function shareReport(){let text=document.getElementById("reportText").value;if(navigator.share)await navigator.share({title:"KM Frota",text});else{await navigator.clipboard.writeText(text);alert("Compartilhamento não disponível. Relatório copiado.")}}
+function exportBackup(){
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`backup_km_frota_${currentDate}.json`;a.click();URL.revokeObjectURL(a.href)
+}
+render();
+</script>
+</body></html>
